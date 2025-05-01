@@ -4,7 +4,7 @@ import '../services/section_detector_service.dart';
 /// from the raw resume text, based on a predefined list of top 20 majors.
 class MajorDetector {
   /// Top 20 academic majors for personalized feedback.
-  static const List<String> _knownMajors = [
+  static const List<String> knownMajors = [
     'Computer Science',
     'Business Administration',
     'Mechanical Engineering',
@@ -59,7 +59,7 @@ class MajorDetector {
   /// appears as a whole‐word match in [block].
   static List<String> _findMajorsIn(String block) {
     final matches = <String>[];
-    for (final major in _knownMajors) {
+    for (final major in knownMajors) {
       final pat = RegExp(r'\b' + RegExp.escape(major.toLowerCase()) + r'\b');
       if (pat.hasMatch(block)) {
         matches.add(major);
@@ -68,4 +68,3 @@ class MajorDetector {
     return matches;
   }
 }
-

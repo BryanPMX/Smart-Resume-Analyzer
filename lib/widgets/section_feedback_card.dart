@@ -51,7 +51,8 @@ class SectionFeedbackCard extends StatelessWidget {
                   style: theme.textTheme.titleMedium,
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: progressColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
