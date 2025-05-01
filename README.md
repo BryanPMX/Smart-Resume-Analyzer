@@ -47,27 +47,4 @@ A cross-platform Flutter application that automatically analyzes and scores PDF 
    flutter pub get
    flutter run
 
-### Architecture
-   lib/
-├── models/
-│   ├── resume.dart              // Resume & parsing metadata
-│   └── section_score.dart       // Per-section scoring model
-├── providers/
-│   └── resume_provider.dart     // ChangeNotifier for state management
-├── services/
-│   ├── pdf_parser_service.dart  // Syncfusion PDF → marked text
-│   ├── section_detector_service.dart  // Splits marked text into blocks
-│   ├── major_detector.dart      // Auto-detects academic major
-│   └── scoring_service.dart     // Section scoring & feedback generation
-├── utils/
-│   └── scoring_rules.dart       // Centralized scoring weights, regex, skills
-├── widgets/
-│   ├── scanning_animation.dart  // Top-to-bottom scan line
-│   └── section_feedback_card.dart // Reusable card to display feedback
-├── screens/
-│   ├── home_screen.dart
-│   ├── upload_screen.dart
-│   └── analysis_screen.dart
-└── main.dart
-
 
