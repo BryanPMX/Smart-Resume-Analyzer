@@ -12,24 +12,29 @@ import '../services/ocr_services.dart';
 import '../services/scoring_service.dart';
 import 'analysis_screen.dart';
 
-/// Screen for uploading a resume by selecting a PDF file or scanning with a camera, then running analysis.
-/// Uses a vertical Stepper for a clear, interactive flow.
+/// A screen for uploading and analyzing a resume, guiding the user through a multi-step process.
+/// The workflow begins with selecting the source type (PDF upload or camera scan), followed by
+/// file selection or scanning, and concludes with resume analysis.
+/// Utilizes a vertical Stepper widget to provide a structured and interactive user experience.
 class UploadScreen extends StatefulWidget {
+  /// Creates an instance of the UploadScreen.
   const UploadScreen({super.key});
 
   @override
   State<UploadScreen> createState() => _UploadScreenState();
 }
 
+/// State class managing the upload and analysis process for the UploadScreen.
 class _UploadScreenState extends State<UploadScreen> {
-  int _currentStep = 0;
-  File? _pickedFile;
-  String? _fileName;
-  String _sourceType = 'pdf'; // 'pdf' or 'camera'
-  bool _isLoading = false;
-  double _buttonScale = 1.0;
+  int _currentStep = 0; // Tracks the current step in the stepper.
+  File? _pickedFile; // Holds the selected or scanned file.
+  String? _fileName; // Stores the name of the selected or scanned file.
+  String _sourceType = 'pdf'; // Indicates the source type, either 'pdf' or 'camera'.
+  bool _isLoading = false; // Indicates if the analysis is in progress.
+  double _buttonScale = 1.0; // Controls the scale of the continue button for tap feedback.
 
-  /// Pick a PDF file from the device.
+  /// Picks a PDF file from the device storage.
+  /// Updates the state with the selected file and its name if successful.
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -43,7 +48,8 @@ class _UploadScreenState extends State<UploadScreen> {
     }
   }
 
-  /// Capture a resume image using the camera with permission handling.
+  /// Captures a resume image using the device camera with permission handling.
+  /// Requests camera permission and updates the state with the captured image if successful.
   Future<void> _scanWithCamera() async {
     final status = await Permission.camera.request();
     if (status.isGranted) {
@@ -83,7 +89,8 @@ class _UploadScreenState extends State<UploadScreen> {
     }
   }
 
-  /// Perform text extraction and analysis based on the selected source, then navigate.
+  /// Performs text extraction and analysis based on the selected source, then navigates to the analysis screen.
+  /// Handles errors and updates the loading state accordingly.
   Future<void> _analyzeResume() async {
     if (_pickedFile == null) return;
     setState(() => _isLoading = true);
@@ -115,54 +122,59 @@ class _UploadScreenState extends State<UploadScreen> {
     }
   }
 
+  /// Handles the continuation to the next step in the stepper.
+  /// Validates that a file has been selected or scanned before proceeding to analysis.
   void _onStepContinue() {
     if (_currentStep == 0) {
-      if (_sourceType == 'pdf' && _pickedFile != null) {
-        setState(() => _currentStep++);
-      } else if (_sourceType == 'camera') {
-        _scanWithCamera().then((_) {
-          if (_pickedFile != null) {
-            setState(() => _currentStep++);
-          }
-        });
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Please pick a PDF or scan with camera first.'),
-            backgroundColor: Colors.indigo,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+      setState(() => _currentStep++);
     } else if (_currentStep == 1) {
-      if (_pickedFile != null) {
-        setState(() => _currentStep++);
-      } else {
+      if (_pickedFile == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('No file selected. Please try again.'),
+            content: const Text('No file selected. Please select a file or scan an image.'),
             backgroundColor: Colors.indigo,
             behavior: SnackBarBehavior.floating,
           ),
         );
+      } else {
+        setState(() => _currentStep++);
       }
     } else {
       _analyzeResume();
     }
   }
 
+  /// Handles moving back to the previous step in the stepper.
   void _onStepCancel() {
     if (_currentStep > 0) {
       setState(() => _currentStep--);
     }
   }
 
+  /// Scales down the continue button when tapped.
   void _onTapDown(TapDownDetails _) => setState(() => _buttonScale = 0.95);
+
+  /// Scales up the continue button and triggers the step continuation.
   void _onTapUp(TapUpDetails _) {
     setState(() => _buttonScale = 1.0);
     _onStepContinue();
   }
+
+  /// Resets the button scale if the tap is canceled.
   void _onTapCancel() => setState(() => _buttonScale = 1.0);
+
+  /// Handles source type selection and triggers camera scan immediately if selected.
+  void _onSourceTypeChanged(String? value) {
+    setState(() {
+      _sourceType = value!;
+      _pickedFile = null; // Reset picked file when source type changes.
+      _fileName = null;
+    });
+
+    if (_sourceType == 'camera') {
+      _scanWithCamera();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -229,42 +241,6 @@ class _UploadScreenState extends State<UploadScreen> {
         },
         steps: [
           Step(
-            title: const Text('Select File'),
-            subtitle: _fileName != null ? Text(_fileName!) : null,
-            content: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Choose your resume source:',
-                  style: theme.textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Semantics(
-                      button: true,
-                      label: 'Pick PDF',
-                      child: ElevatedButton.icon(
-                        onPressed: _pickFile,
-                        icon: const Icon(Icons.file_present),
-                        label: const Text('Pick PDF'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            isActive: _currentStep >= 0,
-            state: _pickedFile != null ? StepState.complete : StepState.indexed,
-          ),
-          Step(
             title: const Text('Source Selection'),
             content: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,18 +254,52 @@ class _UploadScreenState extends State<UploadScreen> {
                   title: const Text('Upload PDF File'),
                   value: 'pdf',
                   groupValue: _sourceType,
-                  onChanged: (value) => setState(() => _sourceType = value!),
+                  onChanged: _onSourceTypeChanged,
                 ),
                 RadioListTile<String>(
                   title: const Text('Scan with Camera'),
                   value: 'camera',
                   groupValue: _sourceType,
-                  onChanged: (value) => setState(() => _sourceType = value!),
+                  onChanged: _onSourceTypeChanged,
                 ),
               ],
             ),
+            isActive: _currentStep >= 0,
+            state: _sourceType != null ? StepState.complete : StepState.indexed,
+          ),
+          Step(
+            title: const Text('Select File'),
+            subtitle: _fileName != null ? Text(_fileName!) : null,
+            content: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_sourceType == 'pdf')
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Semantics(
+                        button: true,
+                        label: 'Pick PDF',
+                        child: ElevatedButton.icon(
+                          onPressed: _pickFile,
+                          icon: const Icon(Icons.file_present),
+                          label: const Text('Pick PDF'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                if (_sourceType == 'camera' && _pickedFile == null)
+                  const Text('Please scan your resume using the camera.'),
+              ],
+            ),
             isActive: _currentStep >= 1,
-            state: StepState.indexed,
+            state: _pickedFile != null ? StepState.complete : StepState.indexed,
           ),
           Step(
             title: const Text('Confirm & Analyze'),

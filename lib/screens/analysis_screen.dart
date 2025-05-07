@@ -1,5 +1,8 @@
 // analysis_screen.dart
+import 'dart:developer' as developer;
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:provider/provider.dart';
 import '../providers/resume_provider.dart';
 import '../widgets/scanning_animation.dart';
@@ -50,6 +53,9 @@ class _AnalysisScreenState extends State<AnalysisScreen>
     final resume = context.watch<ResumeViewModel>().resume;
     final theme = Theme.of(context);
 
+    // No need to filter for null since sectionBreakdown elements are non-nullable
+    final validSections = resume.sectionBreakdown.asMap().entries.toList();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Analyzing Resume'),
@@ -58,7 +64,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
       body: _isAnalyzing
           ? Stack(
         children: [
-          ResumePreview(text: resume.fullText),
+          ResumePreview(file: resume.file),
           ScanningAnimation(controller: _scanController),
         ],
       )
@@ -96,29 +102,35 @@ class _AnalysisScreenState extends State<AnalysisScreen>
                 const SizedBox(height: 24),
 
                 // Section cards: slide in one by one
-                for (var i = 0; i < resume.sectionBreakdown.length; i++)
-                  SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.2),
-                      end: Offset.zero,
-                    ).animate(
-                      CurvedAnimation(
-                        parent: _revealController,
-                        curve: Interval(
-                          0.2 + i * 0.1,
-                          1.0,
-                          curve: Curves.easeOut,
+                if (validSections.isEmpty)
+                  const Text(
+                    'No section analysis available.',
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  )
+                else
+                  for (var entry in validSections)
+                    SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.2),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: _revealController,
+                          curve: Interval(
+                            0.2 + entry.key * 0.1,
+                            1.0,
+                            curve: Curves.easeOut,
+                          ),
                         ),
                       ),
+                      child: SectionFeedbackCard(
+                        title: entry.value.sectionName,
+                        score: entry.value.achievedScore,
+                        maxScore: entry.value.maxScore,
+                        suggestions: entry.value.feedback,
+                        skills: entry.value.matchedContent,
+                      ),
                     ),
-                    child: SectionFeedbackCard(
-                      title: resume.sectionBreakdown[i].sectionName,
-                      score: resume.sectionBreakdown[i].achievedScore,
-                      maxScore: resume.sectionBreakdown[i].maxScore,
-                      suggestions: resume.sectionBreakdown[i].feedback,
-                      skills: resume.sectionBreakdown[i].matchedContent,
-                    ),
-                  ),
 
                 const SizedBox(height: 32),
                 Text(
@@ -167,31 +179,74 @@ class _AnalysisScreenState extends State<AnalysisScreen>
   }
 }
 
-/// Widget that displays a preview of the raw resume text with a subtle background.
-class ResumePreview extends StatelessWidget {
-  final String text;
+/// Stateful widget to handle resume preview with error states.
+class ResumePreview extends StatefulWidget {
+  final File? file;
 
-  const ResumePreview({super.key, required this.text});
+  const ResumePreview({super.key, required this.file});
+
+  @override
+  ResumePreviewState createState() => ResumePreviewState();
+}
+
+/// State class for ResumePreview, managing error states.
+class ResumePreviewState extends State<ResumePreview> {
+  String? _error;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    // Clean text by removing section markers
-    final cleanedText = text.replaceAll(RegExp(r'==SECTION==.*?\n|==PAGE_BREAK==\n'), '').trim();
+    if (widget.file == null) {
+      return Container(
+        color: Colors.grey.shade100,
+        child: const Center(
+          child: Text(
+            'No file available for preview',
+            style: TextStyle(fontSize: 16, color: Colors.black54),
+          ),
+        ),
+      );
+    }
+
+    final isPdf = widget.file!.path.toLowerCase().endsWith('.pdf');
 
     return Container(
       color: Colors.grey.shade100,
-      child: SingleChildScrollView(
-        physics: const NeverScrollableScrollPhysics(), // Lock scrolling during animation
-        padding: const EdgeInsets.all(24),
+      child: _error != null
+          ? Center(
         child: Text(
-          cleanedText.isEmpty ? 'No content available' : cleanedText,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontSize: 14,
-            height: 1.4,
-            color: Colors.black87,
-          ),
+          _error!,
+          style: const TextStyle(color: Colors.red),
         ),
+      )
+          : isPdf
+          ? PDFView(
+        filePath: widget.file!.path,
+        enableSwipe: false, // Disable swipe during animation
+        swipeHorizontal: false,
+        autoSpacing: true,
+        pageFling: false,
+        onError: (error) {
+          developer.log('PDF rendering error: $error');
+          setState(() {
+            _error = 'Error loading PDF: $error';
+          });
+        },
+        onRender: (pages) {
+          debugPrint('PDF rendered with $pages pages');
+        },
+      )
+          : Image.file(
+        widget.file!,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          developer.log('Image rendering error: $error');
+          return Center(
+            child: Text(
+              'Error loading image',
+              style: const TextStyle(color: Colors.red),
+            ),
+          );
+        },
       ),
     );
   }

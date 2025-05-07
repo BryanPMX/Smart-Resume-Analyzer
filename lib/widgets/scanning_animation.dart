@@ -1,4 +1,3 @@
-// scanning_animation.dart
 import 'package:flutter/material.dart';
 
 /// Widget that displays a dynamic scanning animation overlay with a moving bar.
@@ -23,24 +22,12 @@ class ScanningAnimation extends StatelessWidget {
           animation: controller,
           builder: (context, child) {
             // Calculate the bar's top position based on the animation value
-            final barHeight = 20.0;
+            final barHeight = 24.0; // Slightly thicker bar for better visibility
             final topPosition = animation.value * (constraints.maxHeight - barHeight);
 
             return Stack(
               children: [
-                // Subtle blur overlay for text behind the bar
-                Positioned(
-                  top: topPosition + barHeight,
-                  left: 0,
-                  right: 0,
-                  height: constraints.maxHeight - topPosition - barHeight,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withAlpha((0.1 * 255).toInt()),
-                    ),
-                  ),
-                ),
-                // Scanning bar with gradient and glow
+                // Scanning bar with updated gradient and enhanced glow
                 Positioned(
                   top: topPosition,
                   left: 0,
@@ -51,20 +38,25 @@ class ScanningAnimation extends StatelessWidget {
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            Colors.indigo.withAlpha((0.2 * 255).toInt()),
-                            Colors.indigo.withAlpha((0.6 * 255).toInt()),
-                            Colors.indigo.withAlpha((0.2 * 255).toInt()),
+                            // 0.3 * 255 = 76.5 → 76
+                            Colors.blueAccent.withAlpha(76),
+                            // 0.8 * 255 = 204
+                            Colors.blueAccent.withAlpha(204),
+                            // 0.3 * 255 = 76.5 → 76
+                            Colors.blueAccent.withAlpha(76),
                           ],
                           begin: Alignment.centerLeft,
                           end: Alignment.centerRight,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.indigo.withAlpha((0.4 * 255).toInt()),
-                            blurRadius: 8,
-                            spreadRadius: 2,
+                            // 0.5 * 255 = 127.5 → 128
+                            color: Colors.blueAccent.withAlpha(128),
+                            blurRadius: 12,
+                            spreadRadius: 3,
                           ),
                         ],
+                        borderRadius: BorderRadius.circular(4),
                       ),
                     ),
                   ),

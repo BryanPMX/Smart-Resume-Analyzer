@@ -1,5 +1,5 @@
-// resume.dart
 import 'dart:developer' as developer;
+import 'dart:io';
 import 'section_score.dart';
 
 /// Represents a fully parsed and scored resume, containing the raw text, parsed sections,
@@ -10,6 +10,7 @@ class Resume {
 
   final String fileName;
   final String fullText;
+  final File? file; // Add file field to store the original file
   final String? major;
   final int score;
   final List<String> feedback;
@@ -21,6 +22,7 @@ class Resume {
   ///
   /// [fileName] The name of the resume file.
   /// [fullText] The full text content of the resume.
+  /// [file] The original file (PDF or image) of the resume.
   /// [major] The detected academic major, typically set by `ScoringService`.
   /// [score] The overall score (0–100), computed by `ScoringService`.
   /// [feedback] A list of feedback messages, populated by `ScoringService`.
@@ -34,6 +36,7 @@ class Resume {
   Resume({
     required this.fileName,
     required this.fullText,
+    this.file,
     this.major,
     this.score = 0,
     List<String>? feedback,
@@ -76,6 +79,7 @@ class Resume {
   Resume copyWith({
     String? fileName,
     String? fullText,
+    File? file,
     String? major,
     int? score,
     List<String>? feedback,
@@ -87,6 +91,7 @@ class Resume {
     return Resume(
       fileName: fileName ?? this.fileName,
       fullText: fullText ?? this.fullText,
+      file: file ?? this.file,
       major: major ?? this.major,
       score: score ?? this.score,
       feedback: feedback != null ? List<String>.from(feedback) : List<String>.from(this.feedback),
