@@ -82,18 +82,36 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // Animate gradient and then push HomeScreen
+    // Animate gradient immediately
     Future.delayed(const Duration(milliseconds: 100), _animateGradient);
-    Future.delayed(const Duration(seconds: 2), () {
-      Navigator.pushReplacementNamed(context, '/home');
-    });
+    // Schedule navigation after the widget is mounted
+    _scheduleNavigation();
+  }
+
+  void _scheduleNavigation() {
+    if (mounted) {
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/home');
+        }
+      });
+    }
   }
 
   void _animateGradient() {
-    setState(() {
-      _begin = Alignment.bottomRight;
-      _end = Alignment.topLeft;
-    });
+    if (mounted) {
+      setState(() {
+        _begin = Alignment.bottomRight;
+        _end = Alignment.topLeft;
+      });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Ensure navigation is scheduled only once when dependencies are ready
+    _scheduleNavigation();
   }
 
   @override

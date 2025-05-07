@@ -1,11 +1,11 @@
-import 'dart:ui';
+// analysis_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/resume_provider.dart';
 import '../widgets/scanning_animation.dart';
 import '../widgets/section_feedback_card.dart';
 
-/// Screen that runs a scanning animation, then reveals detailed analysis results.
+/// Screen that runs a scanning animation with a resume preview, then reveals detailed analysis results.
 class AnalysisScreen extends StatefulWidget {
   const AnalysisScreen({super.key});
 
@@ -58,7 +58,7 @@ class _AnalysisScreenState extends State<AnalysisScreen>
       body: _isAnalyzing
           ? Stack(
         children: [
-          _BlurredBackground(text: resume.fullText),
+          ResumePreview(text: resume.fullText),
           ScanningAnimation(controller: _scanController),
         ],
       )
@@ -167,30 +167,29 @@ class _AnalysisScreenState extends State<AnalysisScreen>
   }
 }
 
-/// Blurred, low‑opacity text background for the scanning screen.
-class _BlurredBackground extends StatelessWidget {
+/// Widget that displays a preview of the raw resume text with a subtle background.
+class ResumePreview extends StatelessWidget {
   final String text;
 
-  const _BlurredBackground({required this.text});
+  const ResumePreview({super.key, required this.text});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    // Clean text by removing section markers
+    final cleanedText = text.replaceAll(RegExp(r'==SECTION==.*?\n|==PAGE_BREAK==\n'), '').trim();
+
     return Container(
       color: Colors.grey.shade100,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-        child: Opacity(
-          opacity: 0.15,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontSize: 14,
-                height: 1.4,
-                color: Colors.black,
-              ),
-            ),
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(), // Lock scrolling during animation
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          cleanedText.isEmpty ? 'No content available' : cleanedText,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontSize: 14,
+            height: 1.4,
+            color: Colors.black87,
           ),
         ),
       ),

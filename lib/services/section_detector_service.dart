@@ -1,54 +1,158 @@
-/// A service that detects known resume sections within plain text.
-/// Recognizes `==SECTION== Section Name` markers inserted during PDF parsing.
+import '../utils/scoring_rules.dart';
+
+/// A service that splits resume text tagged with `==SECTION==` markers into named
+/// blocks and infers missing sections using heuristics. Ensures all expected sections
+/// are included in the output map, aligning with `PdfParserService` and `ScoringService`.
 class SectionDetectorService {
-  /// Extracts known sections from the structured resume [text].
-  /// Keys: contact, summary, experience, education, skills, certifications, projects.
-  static Map<String, String> detectSections(String text) {
-    final sectionRegex = RegExp(r'^==SECTION==\s+(.+)$', multiLine: true);
-    final matches = sectionRegex.allMatches(text).toList();
+  /// Maximum text length to process to prevent excessive memory usage.
+  static const int _maxTextLength = 100 * 1024; // 100 KB
 
-    final result = <String, String>{};
-    final knownLabels = _labelAliases();
+  /// Canonical section names expected by dependent services.
+  static const List<String> _canonicalSections = [
+    'contact',
+    'summary',
+    'experience',
+    'education',
+    'skills',
+    'projects',
+    'certifications',
+    'miscellaneous',
+  ];
 
-    // 1. Add everything before the first ==SECTION== as 'contact'
-    if (matches.isNotEmpty && matches.first.start > 0) {
-      result['contact'] = text.substring(0, matches.first.start).trim();
-    } else {
-      result['contact'] = '';
+  /// Provides a map of canonical section names to their possible aliases for header matching.
+  static Map<String, List<String>> labelAliases() => {
+    'summary': [
+      'summary',
+      'objective',
+      'professional summary',
+      'profile',
+      'overview',
+    ],
+    'experience': [
+      'experience',
+      'employment',
+      'work history',
+      'work experience',
+      'internships',
+    ],
+    'education': [
+      'education',
+      'academic background',
+      'degrees',
+    ],
+    'skills': [
+      'skills',
+      'technologies',
+      'proficiencies',
+      'abilities',
+    ],
+    'projects': [
+      'projects',
+      'portfolio',
+      'works',
+    ],
+    'certifications': [
+      'certifications',
+      'licenses',
+      'awards',
+    ],
+    'miscellaneous': [
+      'miscellaneous',
+      'other',
+      'hobbies',
+    ],
+  };
+
+  /// Extracts named sections from structured resume [text] containing `==SECTION==` markers.
+  static Map<String, String> detectSections(String text, {bool enableLogging = false}) {
+    if (text.length > _maxTextLength) {
+      throw ArgumentError('Input text exceeds maximum length of $_maxTextLength characters');
     }
 
-    // 2. Iterate through each section marker and extract the block until the next one
+    final sectionRx = RegExp(r'^==SECTION==\s+(.+)$', multiLine: true);
+    final contactRx = RegExp(
+      '(?:' + ScoringRules.emailRegex.pattern + '|' + ScoringRules.phoneRegex.pattern + '|' + ScoringRules.portfolioRegex.pattern + ')',
+      caseSensitive: false,
+    );
+    final dateRx = ScoringRules.dateRangeRegex;
+    final bulletRx = RegExp(r'^\s*(?:[-•]\s+|[A-Za-z\s]+:\s*|[\w\s]+,\s*)');
+    final degreeRx = RegExp(r'\b(university|college|degree|education)\b', caseSensitive: false);
+    final summaryRx = RegExp(r'\b(summary|objective|professional|profile)\b', caseSensitive: false);
+    final skillsRx = RegExp(r'\b(skills|python|java|communication)\b', caseSensitive: false);
+
+    final aliases = labelAliases();
+    final out = <String, String>{};
+    for (var section in _canonicalSections) {
+      out[section] = '';
+    }
+
+    String current = 'contact';
+    final buf = StringBuffer();
+    final matches = sectionRx.allMatches(text).toList();
+
+    // Process content before the first marker (likely Contact or Summary)
+    if (matches.isNotEmpty && matches.first.start > 0) {
+      final preMarkerText = text.substring(0, matches.first.start).trim();
+      final preMarkerLines = preMarkerText.split('\n');
+      for (final line in preMarkerLines) {
+        final trimmedLine = line.trim();
+        if (contactRx.hasMatch(trimmedLine)) {
+          out['contact'] = (out['contact']! + '\n' + trimmedLine).trim();
+        } else if (summaryRx.hasMatch(trimmedLine)) {
+          out['summary'] = trimmedLine;
+        }
+      }
+    }
+
+    // Process explicitly marked sections
     for (var i = 0; i < matches.length; i++) {
-      final rawHeader = matches[i].group(1)?.toLowerCase().trim() ?? '';
-      final canonical = knownLabels.entries
+      final rawHeader = matches[i].group(1)!.toLowerCase().trim();
+      final canon = aliases.entries
           .firstWhere(
-            (entry) => entry.value.any((alias) => rawHeader == alias),
-        orElse: () => const MapEntry('', []),
+            (e) => e.value.contains(rawHeader),
+        orElse: () => const MapEntry('miscellaneous', []),
       )
           .key;
-
-      if (canonical.isEmpty) continue; // skip unknown section labels
-
       final start = matches[i].end;
-      final end = (i < matches.length - 1) ? matches[i + 1].start : text.length;
-      final content = text.substring(start, end).trim();
-
-      result[canonical] = content;
+      final end = (i + 1 < matches.length) ? matches[i + 1].start : text.length;
+      out[canon] = text.substring(start, end).trim();
     }
 
-    return result;
+    // Fallback inference for unmarked content
+    final lines = text.split('\n');
+    for (var line in lines) {
+      final trimmedLine = line.trim();
+      if (trimmedLine.isEmpty) continue;
+
+      final m = sectionRx.firstMatch(trimmedLine);
+      if (m != null) {
+        out[current] = buf.toString().trim();
+        buf.clear();
+        final hdr = m.group(1)!.toLowerCase().trim();
+        current = aliases.entries
+            .firstWhere(
+              (e) => e.value.contains(hdr),
+          orElse: () => const MapEntry('miscellaneous', []),
+        )
+            .key;
+        continue;
+      }
+
+      if (degreeRx.hasMatch(trimmedLine)) {
+        current = 'education';
+      } else if (contactRx.hasMatch(trimmedLine)) {
+        current = 'contact';
+      } else if (summaryRx.hasMatch(trimmedLine)) {
+        current = 'summary';
+      } else if (dateRx.hasMatch(trimmedLine)) {
+        current = 'experience';
+      } else if (bulletRx.hasMatch(trimmedLine) || skillsRx.hasMatch(trimmedLine)) {
+        current = 'skills';
+      }
+      buf.writeln(trimmedLine);
+    }
+    out[current] = buf.toString().trim();
+
+    return out;
   }
-
-  /// Maps canonical section labels to all aliases it may be tagged as.
-  static Map<String, List<String>> _labelAliases() => {
-    'summary': ['summary', 'objective'],
-    'experience': ['experience', 'employment', 'work history'],
-    'education': ['education', 'academic background', 'studies'],
-    'skills': ['skills', 'technologies', 'tools', 'proficiencies'],
-    'projects': ['projects', 'portfolio', 'case studies'],
-    'certifications': ['certifications', 'licenses', 'credentials'],
-  };
 }
-
-
-

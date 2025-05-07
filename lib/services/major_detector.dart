@@ -1,71 +1,111 @@
-import '../services/section_detector_service.dart';
+// major_detector.dart
+import 'dart:developer' as developer;
+import '../utils/scoring_rules.dart';
 
-/// Service responsible for automatically detecting the candidate’s academic major
-/// from the raw resume text, based on a predefined list of top 20 majors.
+/// A service that auto-detects a candidate’s academic major from resume text by matching
+/// against a predefined list of known majors and their aliases. Designed to work with
+/// `ScoringService` to tailor skill scoring and feedback.
 class MajorDetector {
-  /// Top 20 academic majors for personalized feedback.
-  static const List<String> _knownMajors = [
-    'Computer Science',
-    'Business Administration',
-    'Mechanical Engineering',
-    'Nursing',
-    'Electrical Engineering',
-    'Psychology',
-    'Biology',
-    'Economics',
-    'Accounting',
-    'Civil Engineering',
-    'Education',
-    'Finance',
-    'Political Science',
-    'Marketing',
-    'Communications',
-    'Chemistry',
-    'Information Technology',
-    'Graphic Design',
-    'Mathematics',
-    'Environmental Science',
-  ];
+  /// Maximum text length to process to prevent excessive memory usage.
+  static const int _maxTextLength = 100 * 1024; // 100 KB
 
-  /// Attempts to detect the candidate’s major from the resume [text].
-  ///
-  /// 1. Extracts the “education” section via [SectionDetectorService].
-  /// 2. Scans that block with word‑boundary regexes for each known major.
-  /// 3. If exactly one match → returns it; otherwise falls back to entire [text].
-  /// 4. If still ambiguous or none → returns null.
-  static String? detectMajor(String text) {
-    if (text.trim().isEmpty) return null;
+  /// Map of canonical majors to their possible aliases or abbreviations for detection.
+  /// Keys are canonical major names (e.g., 'Computer Science'), and values are lists of
+  /// aliases (e.g., ['Computer Science', 'CS', 'Comp Sci']).
+  static const Map<String, List<String>> _majorAliases = {
+    'Computer Science': ['Computer Science', 'CS', 'Comp Sci'],
+    'Business Administration': ['Business Administration', 'Business Admin', 'Biz Admin'],
+    'Mechanical Engineering': ['Mechanical Engineering', 'Mech Eng', 'Mechanical Eng'],
+    'Nursing': ['Nursing'],
+    'Electrical Engineering': ['Electrical Engineering', 'EE', 'Electrical Eng'],
+    'Psychology': ['Psychology', 'Psych'],
+    'Biology': ['Biology', 'Bio'],
+    'Economics': ['Economics', 'Econ'],
+    'Accounting': ['Accounting', 'Acct'],
+    'Civil Engineering': ['Civil Engineering', 'Civil Eng'],
+    'Education': ['Education', 'Edu'],
+    'Finance': ['Finance', 'Fin'],
+    'Political Science': ['Political Science', 'Poli Sci'],
+    'Marketing': ['Marketing', 'Mktg'],
+    'Communications': ['Communications', 'Comm'],
+    'Chemistry': ['Chemistry', 'Chem'],
+    'Information Technology': ['Information Technology', 'IT', 'Info Tech'],
+    'Graphic Design': ['Graphic Design', 'GD', 'Design'],
+    'Mathematics': ['Mathematics', 'Math', 'Maths'],
+    'Environmental Science': ['Environmental Science', 'Env Sci', 'Environmental Sci'],
+  };
 
-    // 1) Try the education block first
-    final sections = SectionDetectorService.detectSections(text.toLowerCase());
-    final eduBlock = sections['education'] ?? '';
+  /// Provides the list of canonical majors for validation purposes.
+  static Iterable<String> get knownMajors => _majorAliases.keys;
 
-    final foundInEdu = _findMajorsIn(eduBlock);
-    if (foundInEdu.length == 1) {
-      return foundInEdu.first;
-    }
+  /// Precomputed lowercase aliases for efficient matching.
+  static final Map<String, String> _lowercaseToCanonical = _precomputeAliases();
 
-    // 2) Fall back to scanning full text
-    final foundInAll = _findMajorsIn(text.toLowerCase());
-    if (foundInAll.length == 1) {
-      return foundInAll.first;
-    }
-
-    // 3) Ambiguous or none
-    return null;
+  /// Precomputes lowercase aliases mapped to their canonical major names for efficient lookup.
+  static Map<String, String> _precomputeAliases() {
+    final map = <String, String>{};
+    _majorAliases.forEach((canonical, aliases) {
+      for (var alias in aliases) {
+        map[alias.toLowerCase()] = canonical;
+      }
+    });
+    return map;
   }
 
-  /// Helper: returns the list of known majors whose lowercase form
-  /// appears as a whole‐word match in [block].
-  static List<String> _findMajorsIn(String block) {
-    final matches = <String>[];
-    for (final major in _knownMajors) {
-      final pat = RegExp(r'\b' + RegExp.escape(major.toLowerCase()) + r'\b');
-      if (pat.hasMatch(block)) {
-        matches.add(major);
+  /// Detects the candidate’s academic major from the provided [text].
+  ///
+  /// [text] The resume text to analyze, typically the `education` section or full text.
+  /// [enableLogging] If true, logs detection steps for debugging (default: false).
+  ///
+  /// Returns the detected major as a canonical name (e.g., 'Computer Science') if exactly
+  /// one unique major is found, or `null` if no major or multiple distinct majors are detected.
+  ///
+  /// Throws:
+  /// - [ArgumentError] If [text] is empty or exceeds the maximum length.
+  static String? detectMajor(String text, {bool enableLogging = false}) {
+    // Validate input
+    if (text.isEmpty) {
+      throw ArgumentError('Input text cannot be empty');
+    }
+    if (text.length > _maxTextLength) {
+      throw ArgumentError('Input text exceeds maximum length of $_maxTextLength characters');
+    }
+
+    final norm = text.toLowerCase();
+    final matchedMajors = <String>{}; // Use a set to track unique canonical majors
+
+    // Search for each alias in the text
+    for (var entry in _lowercaseToCanonical.entries) {
+      final alias = entry.key;
+      final canonical = entry.value;
+      if (norm.contains(alias)) {
+        matchedMajors.add(canonical);
       }
     }
-    return matches;
+
+    // Validate against ScoringRules.majorRelevantSkills
+    final validMajors = matchedMajors.where((major) {
+      final isValid = ScoringRules.majorRelevantSkills.containsKey(major);
+      if (!isValid && enableLogging) {
+        developer.log('Warning: Detected major "$major" not found in ScoringRules.majorRelevantSkills');
+      }
+      return isValid;
+    }).toList();
+
+    if (enableLogging) {
+      if (validMajors.isEmpty) {
+        developer.log('No valid majors detected in text');
+      } else if (validMajors.length > 1) {
+        developer.log('Multiple majors detected: $validMajors, returning null');
+      } else {
+        developer.log('Detected major: ${validMajors.first}');
+      }
+    }
+
+    // Return the major if exactly one is found, otherwise null
+    return validMajors.length == 1 ? validMajors.first : null;
   }
 }
+
+
 
