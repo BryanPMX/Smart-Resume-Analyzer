@@ -124,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     'Get precise, actionable feedback on clarity, structure, and keywords tailored to your field.',
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.merriweather(
-                                  color: Colors.grey.shade700,
+                                  color: const Color(0xFF454545),
                                   fontSize: 16,
                                   height: 1.5,
                                   fontStyle: FontStyle.italic,

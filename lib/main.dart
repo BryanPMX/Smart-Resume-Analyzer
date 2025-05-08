@@ -7,6 +7,7 @@ import 'screens/home_screen.dart';
 import 'screens/upload_screen.dart';
 import 'screens/analysis_screen.dart';
 import 'utils/scoring_rules.dart';
+import 'widgets/animated_gradient_background.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,8 +32,7 @@ void main() {
 }
 
 /// The root widget of the Smart Resume Analyzer application.
-///
-/// Sets up providers, theming, routes, and the animated splash screen.
+/// Sets up providers, theming, routes, and the splash screen.
 class SmartResumeAnalyzerApp extends StatelessWidget {
   const SmartResumeAnalyzerApp({super.key});
 
@@ -72,8 +72,8 @@ class SmartResumeAnalyzerApp extends StatelessWidget {
   }
 }
 
-/// A full‐screen splash that animates a gradient background and
-/// scales in the app title before routing to HomeScreen.
+/// A full‐screen splash that layers your animated gradient
+/// behind the scaling app title before routing to HomeScreen.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -83,18 +83,11 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  Alignment _begin = Alignment.topLeft;
-  Alignment _end = Alignment.bottomRight;
-  bool _toggled = false;
-
   late final AnimationController _scaleController;
 
   @override
   void initState() {
     super.initState();
-
-    // Start the gradient loop.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loopGradient());
 
     // Scale-in for the title.
     _scaleController = AnimationController(
@@ -104,20 +97,10 @@ class _SplashScreenState extends State<SplashScreen>
       upperBound: 1.0,
     )..forward();
 
-    // Auto-navigate after 3 seconds (brand-consistent duration).
-    Future.delayed(const Duration(seconds: 10), () {
+    // Auto-navigate after 10 seconds.
+    Future.delayed(const Duration(seconds: 5), () {
       if (mounted) Navigator.pushReplacementNamed(context, '/home');
     });
-  }
-
-  void _loopGradient() {
-    if (!mounted) return;
-    setState(() {
-      _toggled = !_toggled;
-      _begin = _toggled ? Alignment.bottomLeft : Alignment.topRight;
-      _end = _toggled ? Alignment.topRight : Alignment.bottomLeft;
-    });
-    Future.delayed(const Duration(seconds: 4), _loopGradient);
   }
 
   @override
@@ -128,39 +111,35 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: Stack(
+        children: [
+          // 1) animated gradient background filling the screen
+          const AnimatedGradientBackground(),
 
-    return AnimatedContainer(
-      constraints: const BoxConstraints.expand(),    // ensures full‐screen
-      duration: const Duration(seconds: 4),
-      onEnd: _loopGradient,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: _begin,
-          end: _end,
-          colors: [colors.primaryContainer, colors.secondaryContainer],
-        ),
-      ),
-      child: SafeArea(
-        child: Center(
-          child: ScaleTransition(
-            scale: _scaleController.drive(
-              CurveTween(curve: Curves.easeOutBack),
-            ),
-            child: Text(
-              'Smart Resume Analyzer',
-              textAlign: TextAlign.center,
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineSmall
-                  ?.copyWith(
-                color: const Color(0xFF155C9C),
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
+          // 2) centered, scaling title on top
+          SafeArea(
+            child: Center(
+              child: ScaleTransition(
+                scale: _scaleController.drive(
+                  CurveTween(curve: Curves.easeOutBack),
+                ),
+                child: Text(
+                  'Smart Resume Analyzer',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineSmall
+                      ?.copyWith(
+                    color: const Color(0xFF155C9C),
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
