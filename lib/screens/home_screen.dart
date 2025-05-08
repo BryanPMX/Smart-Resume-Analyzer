@@ -63,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text(
                       'Smart Resume Analyzer',
                       style: GoogleFonts.merriweather(
-                        color: Colors.grey.shade800,
+                        color: const Color(0xFF1E88E5),
                         fontWeight: FontWeight.w700,
                         fontSize: 24,
                       ),
@@ -105,8 +105,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         child: Text(
-                          'Leverage data-driven insights and industry-aligned scoring to elevate your resume’s impact. '
-                              'Get precise, actionable feedback on clarity, structure, and keywords—tailored to your field.',
+                          'Leverage data-driven insights and industry aligned scoring to elevate your resume’s impact. '
+                              'Get precise, actionable feedback on clarity, structure, and keywords tailored to your field.',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.merriweather(
                             color: Colors.grey.shade700,
@@ -148,8 +148,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               icon: Icons.track_changes,
                               title: 'Methodology',
                               content:
-                              'We split your resume into seven key sections—Contact, Summary, '
-                                  'Experience, Education, Skills, Projects, Certifications—and score '
+                              'We split your resume into seven key sections: Contact, Summary, '
+                                  'Experience, Education, Skills, Projects, Certifications and score '
                                   'each against best-practice criteria.',
                             ),
                             const Divider(height: 1, indent: 16, endIndent: 16),
@@ -173,8 +173,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               icon: Icons.lightbulb,
                               title: 'Major Detection',
                               content:
-                              'AI scans your Education section for your major to tailor skills '
-                                  'recommendations; falls back to general criteria if none found.',
+                              'The backend examines the Education section to identify your field of study and personalize skill suggestions accordingly;\n'
+                                'if it can’t determine a major, it defaults to a broader, general set of recommendations.',
                             ),
                           ],
                         ),

@@ -146,14 +146,14 @@ class _SplashScreenState extends State<SplashScreen>
               CurveTween(curve: Curves.easeOutBack),
             ),
             child: Text(
-              'Smart Resume\nAnalyzer',
+              'Smart Resume Analyzer',
               textAlign: TextAlign.center,
               style: Theme.of(context)
                   .textTheme
                   .headlineSmall
                   ?.copyWith(
-                color: colors.onPrimaryContainer,
-                fontSize: 42,
+                color: const Color(0xFF1E88E5),
+                fontSize: 32,
                 fontWeight: FontWeight.bold,
               ),
             ),

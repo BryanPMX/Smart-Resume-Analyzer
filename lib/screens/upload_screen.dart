@@ -266,9 +266,9 @@ class _UploadScreenState extends State<UploadScreen>
                     if (_isScanning)
                       Positioned.fill(
                         child: ScanningAnimation(
-                          duration: const Duration(seconds: 3),
-                          beamHeight: 30.0,              // <-- renamed
-                          beamColor: Colors.white,       // <-- renamed
+                          duration: const Duration(seconds: 5),
+                          beamHeight: 30.0,
+                          beamColor: Colors.white,
                           dimBackground: true,
                         ),
                       ),
