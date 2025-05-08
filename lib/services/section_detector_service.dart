@@ -1,157 +1,106 @@
-import '../utils/scoring_rules.dart';
+import 'dart:developer' as developer;
+import '../utils/section_rules.dart';
 
-/// A service that splits resume text tagged with `==SECTION==` markers into named
-/// blocks and infers missing sections using heuristics. Ensures all expected sections
-/// are included in the output map, aligning with `PdfParserService` and `ScoringService`.
+/// Splits resume text (with optional `==SECTION==` markers) into named blocks,
+/// and infers any unmarked content via regex heuristics. Always returns a map
+/// containing every key from [SectionRules.canonicalSections].
 class SectionDetectorService {
-  /// Maximum text length to process to prevent excessive memory usage.
-  static const int _maxTextLength = 100 * 1024; // 100 KB
+  /// Ensures we don’t process extremely large blobs.
+  static const int _maxTextLength = SectionRules.maxTextLength;
 
-  /// Canonical section names expected by dependent services.
-  static const List<String> _canonicalSections = [
-    'contact',
-    'summary',
-    'experience',
-    'education',
-    'skills',
-    'projects',
-    'certifications',
-    'miscellaneous',
-  ];
-
-  /// Provides a map of canonical section names to their possible aliases for header matching.
-  static Map<String, List<String>> labelAliases() => {
-    'summary': [
-      'summary',
-      'objective',
-      'professional summary',
-      'profile',
-      'overview',
-    ],
-    'experience': [
-      'experience',
-      'employment',
-      'work history',
-      'work experience',
-      'internships',
-    ],
-    'education': [
-      'education',
-      'academic background',
-      'degrees',
-    ],
-    'skills': [
-      'skills',
-      'technologies',
-      'proficiencies',
-      'abilities',
-    ],
-    'projects': [
-      'projects',
-      'portfolio',
-      'works',
-    ],
-    'certifications': [
-      'certifications',
-      'licenses',
-      'awards',
-    ],
-    'miscellaneous': [
-      'miscellaneous',
-      'other',
-      'hobbies',
-    ],
-  };
-
-  /// Extracts named sections from structured resume [text] containing `==SECTION==` markers.
-  static Map<String, String> detectSections(String text, {bool enableLogging = false}) {
+  /// Main entry point: returns a map sectionName → sectionText.
+  static Map<String, String> detectSections(
+      String text, {
+        bool enableLogging = false,
+      }) {
     if (text.length > _maxTextLength) {
-      throw ArgumentError('Input text exceeds maximum length of $_maxTextLength characters');
+      throw ArgumentError('Input exceeds $_maxTextLength characters');
     }
-
-    final sectionRx = RegExp(r'^==SECTION==\s+(.+)$', multiLine: true);
-    final contactRx = RegExp(
-      '(?:' + ScoringRules.emailRegex.pattern + '|' + ScoringRules.phoneRegex.pattern + '|' + ScoringRules.portfolioRegex.pattern + ')',
-      caseSensitive: false,
-    );
-    final dateRx = ScoringRules.dateRangeRegex;
-    final bulletRx = RegExp(r'^\s*(?:[-•]\s+|[A-Za-z\s]+:\s*|[\w\s]+,\s*)');
-    final degreeRx = RegExp(r'\b(university|college|degree|education)\b', caseSensitive: false);
-    final summaryRx = RegExp(r'\b(summary|objective|professional|profile)\b', caseSensitive: false);
-    final skillsRx = RegExp(r'\b(skills|python|java|communication)\b', caseSensitive: false);
-
-    final aliases = labelAliases();
+    // Prepare the output with empty strings for every section
     final out = <String, String>{};
-    for (var section in _canonicalSections) {
-      out[section] = '';
+    for (final sec in SectionRules.canonicalSections) {
+      out[sec] = '';
     }
 
-    String current = 'contact';
-    final buf = StringBuffer();
-    final matches = sectionRx.allMatches(text).toList();
-
-    // Process content before the first marker (likely Contact or Summary)
-    if (matches.isNotEmpty && matches.first.start > 0) {
-      final preMarkerText = text.substring(0, matches.first.start).trim();
-      final preMarkerLines = preMarkerText.split('\n');
-      for (final line in preMarkerLines) {
-        final trimmedLine = line.trim();
-        if (contactRx.hasMatch(trimmedLine)) {
-          out['contact'] = (out['contact']! + '\n' + trimmedLine).trim();
-        } else if (summaryRx.hasMatch(trimmedLine)) {
-          out['summary'] = trimmedLine;
+    // Helper to flush buffer into the current section
+    void flush(String current, StringBuffer buf) {
+      final content = buf.toString().trim();
+      if (content.isNotEmpty) {
+        out[current] = (out[current]! + '\n' + content).trim();
+        if (enableLogging) {
+          developer.log('Flushed to [$current]: ${content.length} chars');
         }
       }
+      buf.clear();
     }
+
+    final matches = SectionRules.sectionMarker.allMatches(text).toList();
+    final buf = StringBuffer();
+    var current = 'contact';
 
     // Process explicitly marked sections
     for (var i = 0; i < matches.length; i++) {
-      final rawHeader = matches[i].group(1)!.toLowerCase().trim();
-      final canon = aliases.entries
-          .firstWhere(
-            (e) => e.value.contains(rawHeader),
-        orElse: () => const MapEntry('miscellaneous', []),
-      )
-          .key;
+      // Flush previous buffer
+      flush(current, buf);
+
+      final header = matches[i].group(1)!.toLowerCase().trim();
+      current = SectionRules.aliasToSection[header] ?? 'miscellaneous';
+      if (enableLogging) {
+        developer.log('Explicit marker: switching to "$current"');
+      }
+
+      // Determine the span of this section’s body
       final start = matches[i].end;
       final end = (i + 1 < matches.length) ? matches[i + 1].start : text.length;
-      out[canon] = text.substring(start, end).trim();
+      buf.write(text.substring(start, end));
     }
+    // After markers, anything not consumed above
+    if (matches.isEmpty) {
+      buf.write(text);
+    }
+    // Now fallback‐infer on a line‐by‐line basis for unmarked text
+    final lines = buf.toString().split('\n');
+    buf.clear();
+    for (final raw in lines) {
+      final line = raw.trim();
+      if (line.isEmpty) continue;
 
-    // Fallback inference for unmarked content
-    final lines = text.split('\n');
-    for (var line in lines) {
-      final trimmedLine = line.trim();
-      if (trimmedLine.isEmpty) continue;
-
-      final m = sectionRx.firstMatch(trimmedLine);
+      // If line itself is a marker, flush & switch
+      final m = SectionRules.sectionMarker.firstMatch(raw);
       if (m != null) {
-        out[current] = buf.toString().trim();
-        buf.clear();
+        flush(current, buf);
         final hdr = m.group(1)!.toLowerCase().trim();
-        current = aliases.entries
-            .firstWhere(
-              (e) => e.value.contains(hdr),
-          orElse: () => const MapEntry('miscellaneous', []),
-        )
-            .key;
+        current = SectionRules.aliasToSection[hdr] ?? 'miscellaneous';
+        if (enableLogging) {
+          developer.log('Fallback marker detected: "$current"');
+        }
         continue;
       }
 
-      if (degreeRx.hasMatch(trimmedLine)) {
+      // Heuristic switches
+      if (SectionRules.educationPattern.hasMatch(line)) {
+        flush(current, buf);
         current = 'education';
-      } else if (contactRx.hasMatch(trimmedLine)) {
+      } else if (SectionRules.contactPattern.hasMatch(line)) {
+        flush(current, buf);
         current = 'contact';
-      } else if (summaryRx.hasMatch(trimmedLine)) {
+      } else if (SectionRules.summaryPattern.hasMatch(line)) {
+        flush(current, buf);
         current = 'summary';
-      } else if (dateRx.hasMatch(trimmedLine)) {
+      } else if (SectionRules.datePattern.hasMatch(line)) {
+        flush(current, buf);
         current = 'experience';
-      } else if (bulletRx.hasMatch(trimmedLine) || skillsRx.hasMatch(trimmedLine)) {
+      } else if (SectionRules.bulletPattern.hasMatch(line) ||
+          SectionRules.skillsPattern.hasMatch(line)) {
+        flush(current, buf);
         current = 'skills';
       }
-      buf.writeln(trimmedLine);
+
+      // Append to current buffer
+      buf.writeln(raw);
     }
-    out[current] = buf.toString().trim();
+    // Flush the very last buffer
+    flush(current, buf);
 
     return out;
   }

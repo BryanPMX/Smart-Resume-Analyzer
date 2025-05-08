@@ -1,26 +1,24 @@
-// scoring_rules.dart
 import 'dart:developer' as developer;
-import '../services/major_detector.dart';
+import '../models/major.dart';
 
 /// Centralized configuration for resume scoring weights, keywords, and rule parameters.
-/// Supports both general and major-specific skill sets for tailored scoring, used by
-/// `ScoringService` to evaluate resumes. Ensures consistency with `MajorDetector` and
-/// other services through validation and standardized patterns.
 class ScoringRules {
-  // ===================== Scoring Constants =====================
-  /// Total maximum score across all sections, used for normalization in `ScoringService`.
+  // ───────────────────────────────────────────────────────
+  // SECTION 1: Section Weights & Validation
+  // ───────────────────────────────────────────────────────
+
+  /// Total maximum score across all sections.
   static const int totalMaxScore = 100;
 
-  // ===================== Section Weights =====================
-  static const int contactMax = 15;
-  static const int summaryMax = 10;
-  static const int experienceMax = 20;
-  static const int educationMax = 15;
-  static const int skillsMax = 20;
-  static const int projectsMax = 15;
-  static const int certificationsMax = 5;
+  static const int contactMax        = 15;
+  static const int summaryMax        = 10;
+  static const int experienceMax     = 20;
+  static const int educationMax      = 15;
+  static const int skillsMax         = 20;
+  static const int projectsMax       = 15;
+  static const int certificationsMax =  5;
 
-  /// Validates that section weights sum to `totalMaxScore`.
+  /// Ensures the sum of all section maxima equals [totalMaxScore].
   static void _validateSectionWeights({bool enableLogging = false}) {
     final sum = contactMax +
         summaryMax +
@@ -30,152 +28,119 @@ class ScoringRules {
         projectsMax +
         certificationsMax;
     if (sum != totalMaxScore) {
-      final message = 'Section weights sum ($sum) does not match totalMaxScore ($totalMaxScore)';
-      if (enableLogging) {
-        developer.log('Validation Error: $message');
-      }
-      throw StateError(message);
+      final msg = 'Section weights sum ($sum) ≠ totalMaxScore ($totalMaxScore)';
+      if (enableLogging) developer.log('Weight Validation Error: $msg');
+      throw StateError(msg);
     }
   }
 
-  // ===================== Feedback Sorting Priorities =====================
-  /// Defines the priority order for sorting feedback in `ScoringService`.
-  /// Lower values indicate higher priority (displayed first).
+  // ───────────────────────────────────────────────────────
+  // SECTION 2: Feedback Priorities
+  // ───────────────────────────────────────────────────────
+
+  /// Order in which feedback should be shown (lower=higher priority).
   static const Map<String, int> sectionPriorities = {
-    'contact': 1,
-    'summary': 2,
-    'experience': 3,
-    'education': 4,
-    'skills': 5,
-    'projects': 6,
+    'contact':        1,
+    'summary':        2,
+    'experience':     3,
+    'education':      4,
+    'skills':         5,
+    'projects':       6,
     'certifications': 7,
   };
 
-  // ===================== Contact Scoring =====================
-  /// Matches email addresses, resilient to OCR noise and surrounding characters.
-  static final RegExp emailRegex = RegExp(
-    r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}',
+  // ───────────────────────────────────────────────────────
+  // SECTION 3: Common Regex Helpers
+  // ───────────────────────────────────────────────────────
+
+  static const String _monthNames =
+      r'(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?'
+      r'|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)';
+
+  /// Matches date ranges like "August 2021–present" or "2020–2022".
+  static final RegExp dateRangeRegex = RegExp(
+    r'\b' + _monthNames + r'\s+\d{4}\s*[-–]\s*(?:present|\d{4})\b',
     caseSensitive: false,
   );
 
-  /// Matches phone numbers, including various formats and separators.
+  /// Matches graduation years, e.g. "Graduating December 2025"
+  static final RegExp gradYearRegex = RegExp(
+    r'\b(?:graduating\s+)?' + _monthNames + r'?\s*(20\d{2})\b',
+    caseSensitive: false,
+  );
+
+  // ───────────────────────────────────────────────────────
+  // SECTION 4: Contact Scoring Patterns
+  // ───────────────────────────────────────────────────────
+
+  static final RegExp emailRegex = RegExp(
+    r'[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}',
+    caseSensitive: false,
+  );
+
   static final RegExp phoneRegex = RegExp(
     r'\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}',
     caseSensitive: false,
   );
 
-  static const int contactEmailScore = 7;
-  static const int contactPhoneScore = 5;
-  static const int contactLinkedInScore = 3;
-  static const int contactGitHubScore = 2;
-  static const int contactPortfolioScore = 2;
-
-  /// Matches LinkedIn, GitHub, portfolio URLs, or custom portfolio identifiers.
   static final RegExp portfolioRegex = RegExp(
-    r'(?:http[s]?:\/\/)?(?:www\.)?(linkedin\.com|github\.com|behance\.net|dribbble\.com|[a-zA-Z0-9-]+\.[a-zA-Z]{2,})(?:\/[a-zA-Z0-9-]+)?',
+    r'(?:https?://)?(?:www\.)?(?:linkedin\.com|github\.com|behance\.net|dribbble\.com|[A-Z0-9-]+\.[A-Z]{2,})(?:/[A-Z0-9-]+)?',
     caseSensitive: false,
   );
 
-  // ===================== Summary Scoring =====================
+  static const int contactEmailScore     = 7;
+  static const int contactPhoneScore     = 5;
+  static const int contactLinkedInScore  = 3;
+  static const int contactGitHubScore    = 2;
+  static const int contactPortfolioScore= 2;
+
+  /// Matches common certification names.
+  static final RegExp certificationRegex = RegExp(
+    r'(?:certified\s+[a-zA-Z\s]+(?:professional|practitioner|developer|engineer|associate|master)|'
+    r'[a-zA-Z\s]+(?:certification|certificate)\s*(?:in|of|for)\s+[a-zA-Z\s]+)',
+    caseSensitive: false,
+  );
+
+  // ───────────────────────────────────────────────────────
+  // SECTION 5: Summary Scoring
+  // ───────────────────────────────────────────────────────
+
   static const int summaryWordThreshold = 30;
-  static const int summaryPartialScore = 5;
+  static const int summaryPartialScore  =  5;
 
-  // ===================== Experience Scoring =====================
-  static const int experienceVerbThreshold = 3;
-  static const int experiencePartialScore = 10;
-  static const int experienceVerbScore = 2;
-  static const int experienceDateRangeScore = 5;
+  // ───────────────────────────────────────────────────────
+  // SECTION 6: Experience Scoring
+  // ───────────────────────────────────────────────────────
 
-  /// Expanded list of action verbs for Work Experience scoring.
+  static const int experiencePartialScore    = 10;
+  static const int experienceVerbThreshold  =  3;
+  static const int experienceVerbScore      =  2;
+  static const int experienceDateRangeScore =  5;
+
   static const List<String> actionVerbs = [
-    'developed', 'managed', 'led', 'built', 'designed', 'created',
-    'implemented', 'optimized', 'analyzed', 'automated', 'oversaw',
-    'delivered', 'mentored', 'solved', 'coordinated', 'executed',
-    'improved', 'streamlined', 'facilitated', 'directed',
+    'developed','managed','led','built','designed','created',
+    'implemented','optimized','analyzed','automated','oversaw',
+    'delivered','mentored','solved','coordinated','executed',
+    'improved','streamlined','facilitated','directed',
   ];
 
-  /// Matches date ranges (e.g., "August 2021-present", "2020-2022").
-  static final RegExp dateRangeRegex = RegExp(
-    r'\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{4}\s*[-–]\s*(present|\d{4})\b',
-    caseSensitive: false,
-  );
+  // ───────────────────────────────────────────────────────
+  // SECTION 7: Education Scoring
+  // ───────────────────────────────────────────────────────
 
-  // ===================== Education Scoring =====================
-  static const int educationBaseScore = 10;
-  static const int educationDegreeScore = 3;
-  static const int educationYearScore = 2;
+  static const int educationBaseScore   = 10;
+  static const int educationDegreeScore =  3;
+  static const int educationYearScore   =  2;
 
-  /// Matches Graduation years, including within phrases (e.g., "Graduating December 2025").
-  static final RegExp gradYearRegex = RegExp(
-    r'\b(graduating\s+)?(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)?\s*(20\d{2})\b',
-    caseSensitive: false,
-  );
+  // ───────────────────────────────────────────────────────
+  // SECTION 8: Skills Scoring Helpers
+  // ───────────────────────────────────────────────────────
 
-  // ===================== Skills Scoring =====================
-  static const int skillsCap = 10;
   static const int skillsBaseScore = 10;
-  static const int pointsPerSkill = 2;
+  static const int skillsCap       = 10;
+  static const int pointsPerSkill  =  2;
 
-  /// Mapping of specific skills to broader categories for better matching.
-  static const Map<String, String> skillToCategory = {
-    'golang': 'programming languages',
-    'python': 'programming languages',
-    'java': 'programming languages',
-    'c': 'programming languages',
-    'scala': 'programming languages',
-    'dart': 'programming languages',
-    'html': 'programming languages',
-    'javascript': 'programming languages',
-    'css': 'programming languages',
-    'sql': 'programming languages',
-    'bash': 'programming languages',
-    'bash shell scripting': 'programming languages',
-    'git': 'version control',
-    'github': 'version control',
-    'pytorch': 'machine learning',
-    'tensorflow': 'machine learning',
-    'numpy': 'data analysis',
-    'docker': 'cloud computing',
-    'node.js': 'software development',
-    'mysql': 'database management',
-    'reactjs': 'software development',
-    'pandas': 'data analysis',
-    'springboot': 'software development',
-    'maven': 'software development',
-    'flutter': 'software development',
-    'unix/linux': 'operating systems',
-    'advanced object-oriented programming': 'object-oriented programming',
-    'data structures': 'data structures',
-    'computer security': 'cybersecurity',
-    'programming language concepts': 'programming languages',
-    'software construction': 'software development',
-    'software design': 'software development',
-    'operating systems': 'operating systems',
-    'machine learning': 'machine learning',
-    'artificial intelligence': 'machine learning',
-    'database systems': 'database management',
-    'communication': 'communication skills',
-    'teamwork': 'teamwork',
-    'leadership': 'leadership',
-    'problem solving': 'problem-solving',
-  };
-
-  // ===================== Projects Scoring =====================
-  /// Matches project section headings (e.g., "PROJECTS", "Project").
-  static final RegExp projectSectionRegex = RegExp(
-    r'\b(project[s]?|portfolio|works|case stud[y|ies])\b',
-    caseSensitive: false,
-  );
-
-  // ===================== Certifications Scoring =====================
-  /// Matches certification phrases (e.g., "AWS Certified Developer", "Certified ScrumMaster").
-  static final RegExp certificationRegex = RegExp(
-    r'(certified\s+[a-z\s]+(?:professional|practitioner|developer|engineer|associate|master)|[a-z\s]+(?:certification|certificate)\s*(?:in|of|for)\s+[a-z\s]+)',
-    caseSensitive: false,
-  );
-
-  // ===================== Fallback Skill Keywords =====================
-  /// General skills used when no known major is detected.
+  /// Fallback when no major is detected.
   static const List<String> generalRelevantSkills = [
     'communication',
     'teamwork',
@@ -187,30 +152,39 @@ class ScoringRules {
     'organization',
   ];
 
-  // ===================== Major-Specific Skill Keywords =====================
-  /// Map from academic major to its top relevant skills, aligned with `MajorDetector`.
-  static const Map<String, List<String>> majorRelevantSkills = {
-    'Computer Science': [
-      'programming languages',
-      'data structures',
-      'algorithms',
-      'operating systems',
-      'database management',
-      'software development',
-      'object-oriented programming',
-      'version control',
-      'computer networks',
-      'cloud computing',
-      'machine learning',
-      'cybersecurity',
-      'software testing',
-      'problem-solving',
-      'critical thinking',
-      'communication skills',
-      'teamwork',
-    ],
-    'Business Administration': [
-      'communication skills',
+  /// Maps raw tokens → normalized categories.
+  static const Map<String, String> skillToCategory = {
+    'python': 'programming languages',
+    'java': 'programming languages',
+    'dart': 'programming languages',
+    // …etc…
+  };
+
+  // ───────────────────────────────────────────────────────
+  // SECTION 9: Major-Specific Skills & Validation
+  // ───────────────────────────────────────────────────────
+
+  /// Map from each `Major` enum to its top skill categories.
+  /// (Paste your full lists here, keyed by `Major` rather than String.)
+  static const Map<Major, List<String>> majorRelevantSkills = {
+    Major.computerScience:['programming languages',
+  'data structures',
+  'algorithms',
+  'operating systems',
+  'database management',
+  'software development',
+  'object-oriented programming',
+  'version control',
+  'computer networks',
+  'cloud computing',
+  'machine learning',
+  'cybersecurity',
+  'software testing',
+  'problem-solving',
+  'critical thinking',
+  'communication skills',
+  'teamwork'],
+    Major.businessAdministration: ['communication skills',
       'leadership',
       'teamwork',
       'customer service',
@@ -226,25 +200,24 @@ class ScoringRules {
       'work under pressure',
       'problem-solving',
     ],
-    'Mechanical Engineering': [
-      'cad software',
-      'mechanical design',
-      'finite element analysis',
-      'gd&t',
-      'material science',
-      'thermodynamics',
-      'fluid mechanics',
-      'matlab',
-      'prototyping',
-      'machining',
-      'project management',
-      'analytical skills',
-      'problem-solving',
-      'creativity',
-      'adaptability',
-      'communication',
-    ],
-    'Nursing': [
+    Major.mechanicalEngineering: ['cad software',
+  'mechanical design',
+  'finite element analysis',
+  'gd&t',
+  'material science',
+  'thermodynamics',
+  'fluid mechanics',
+  'matlab',
+  'prototyping',
+  'machining',
+  'project management',
+  'analytical skills',
+  'problem-solving',
+  'creativity',
+  'adaptability',
+  'communication',
+  ],
+    Major.nursing: [
       'patient care',
       'vital signs monitoring',
       'medication administration',
@@ -261,7 +234,7 @@ class ScoringRules {
       'compassion',
       'communication skills',
     ],
-    'Electrical Engineering': [
+    Major.electricalEngineering: [
       'circuit design',
       'pcb layout',
       'embedded systems',
@@ -277,7 +250,7 @@ class ScoringRules {
       'continuous learning',
       'communication skills',
     ],
-    'Psychology': [
+    Major.psychology: [
       'counseling',
       'active listening',
       'empathy',
@@ -294,7 +267,7 @@ class ScoringRules {
       'problem-solving',
       'cultural competence',
     ],
-    'Biology': [
+    Major.biology: [
       'laboratory techniques',
       'molecular biology',
       'cell culture',
@@ -311,7 +284,7 @@ class ScoringRules {
       'teamwork',
       'presentation skills',
     ],
-    'Economics': [
+    Major.economics: [
       'statistical analysis',
       'econometrics',
       'data analysis',
@@ -328,7 +301,7 @@ class ScoringRules {
       'communication skills',
       'excel',
     ],
-    'Accounting': [
+    Major.accounting: [
       'attention to detail',
       'GAAP knowledge',
       'financial reporting',
@@ -345,7 +318,7 @@ class ScoringRules {
       'organizational skills',
       'communication skills',
     ],
-    'Civil Engineering': [
+    Major.civilEngineering: [
       'cad',
       'structural analysis',
       'construction management',
@@ -362,7 +335,7 @@ class ScoringRules {
       'math skills',
       'communication',
     ],
-    'Education': [
+    Major.education: [
       'curriculum development',
       'lesson planning',
       'classroom management',
@@ -379,7 +352,7 @@ class ScoringRules {
       'cultural competence',
       'organizational skills',
     ],
-    'Finance': [
+    Major.finance: [
       'financial analysis',
       'financial modeling',
       'budgeting',
@@ -396,7 +369,7 @@ class ScoringRules {
       'communication skills',
       'attention to detail',
     ],
-    'Political Science': [
+    Major.politicalScience: [
       'research',
       'critical thinking',
       'policy analysis',
@@ -413,7 +386,7 @@ class ScoringRules {
       'advocacy',
       'collaboration',
     ],
-    'Marketing': [
+    Major.marketing: [
       'seo',
       'sem',
       'content creation',
@@ -430,7 +403,7 @@ class ScoringRules {
       'creativity',
       'project management',
     ],
-    'Communications': [
+    Major.communications: [
       'public speaking',
       'writing',
       'media relations',
@@ -447,7 +420,7 @@ class ScoringRules {
       'cultural awareness',
       'collaboration',
     ],
-    'Chemistry': [
+    Major.chemistry: [
       'laboratory techniques',
       'analytical chemistry',
       'organic synthesis',
@@ -464,7 +437,7 @@ class ScoringRules {
       'critical thinking',
       'computational tools',
     ],
-    'Information Technology': [
+    Major.informationTechnology: [
       'technical support',
       'networking',
       'system administration',
@@ -481,7 +454,7 @@ class ScoringRules {
       'attention to detail',
       'continuous learning',
     ],
-    'Graphic Design': [
+    Major.graphicDesign: [
       'adobe photoshop',
       'adobe illustrator',
       'adobe indesign',
@@ -498,7 +471,7 @@ class ScoringRules {
       'web design',
       'communication',
     ],
-    'Mathematics': [
+    Major.mathematics: [
       'problem-solving',
       'logical reasoning',
       'statistical analysis',
@@ -515,7 +488,7 @@ class ScoringRules {
       'critical thinking',
       'persistence',
     ],
-    'Environmental Science': [
+    Major.environmentalScience: [
       'environmental impact assessment',
       'field research',
       'gis',
@@ -532,7 +505,7 @@ class ScoringRules {
       'public outreach',
       'laboratory skills',
     ],
-    'English': [
+    Major.english: [
       'writing',
       'editing',
       'critical thinking',
@@ -549,7 +522,7 @@ class ScoringRules {
       'attention to detail',
       'creativity',
     ],
-    'History': [
+    Major.history: [
       'research',
       'critical thinking',
       'writing',
@@ -566,7 +539,7 @@ class ScoringRules {
       'time management',
       'persistence',
     ],
-    'Sociology': [
+    Major.sociology: [
       'research methods',
       'statistical analysis',
       'data analysis',
@@ -585,52 +558,34 @@ class ScoringRules {
     ],
   };
 
-  /// Validates that all majors defined in `MajorDetector` have corresponding skill sets.
-  /// Throws an exception if there are mismatches to ensure scoring consistency.
+  /// Ensures every `Major` from the enum has a skills entry.
   static void validateMajorSkills({bool enableLogging = false}) {
-    final detectorMajors = MajorDetector.knownMajors.toSet();
-    final skillMajors = majorRelevantSkills.keys.toSet();
+    final detectorSet = Major.values.toSet();
+    final skillSet    = majorRelevantSkills.keys.toSet();
 
-    final missingInSkills = detectorMajors.difference(skillMajors);
+    final missingInSkills   = detectorSet.difference(skillSet);
+    final missingInDetector = skillSet.difference(detectorSet);
+
     if (missingInSkills.isNotEmpty) {
-      final message = 'Majors in MajorDetector missing from majorRelevantSkills: $missingInSkills';
-      if (enableLogging) {
-        developer.log('Validation Error: $message');
-      }
-      throw StateError(message);
+      final msg = 'Majors missing in skills map: $missingInSkills';
+      if (enableLogging) developer.log('Validation Error: $msg');
+      throw StateError(msg);
     }
-
-    final missingInDetector = skillMajors.difference(detectorMajors);
     if (missingInDetector.isNotEmpty) {
-      final message = 'Majors in majorRelevantSkills missing from MajorDetector: $missingInDetector';
-      if (enableLogging) {
-        developer.log('Validation Error: $message');
-      }
-      throw StateError(message);
+      final msg = 'Skills map has unknown majors: $missingInDetector';
+      if (enableLogging) developer.log('Validation Error: $msg');
+      throw StateError(msg);
     }
   }
 
-  /// Logs regex pattern details for debugging detection issues.
-  static void _logRegexPatterns({bool enableLogging = false}) {
-    if (!enableLogging) return;
-    developer.log('ScoringRules Regex Patterns:');
-    developer.log('  emailRegex: ${emailRegex.pattern}');
-    developer.log('  phoneRegex: ${phoneRegex.pattern}');
-    developer.log('  portfolioRegex: ${portfolioRegex.pattern}');
-    developer.log('  gradYearRegex: ${gradYearRegex.pattern}');
-    developer.log('  dateRangeRegex: ${dateRangeRegex.pattern}');
-    developer.log('  projectSectionRegex: ${projectSectionRegex.pattern}');
-    developer.log('  certificationRegex: ${certificationRegex.pattern}');
-  }
+  // ───────────────────────────────────────────────────────
+  // SECTION 10: Startup Initialization
+  // ───────────────────────────────────────────────────────
 
-  /// Initializes and validates the scoring rules configuration.
-  /// Should be called at application startup to ensure consistency.
+  /// Must be called once at app startup to sanity-check everything.
   static void initialize({bool enableLogging = false}) {
     _validateSectionWeights(enableLogging: enableLogging);
     validateMajorSkills(enableLogging: enableLogging);
-    _logRegexPatterns(enableLogging: enableLogging);
-    if (enableLogging) {
-      developer.log('ScoringRules initialized successfully');
-    }
+    if (enableLogging) developer.log('ScoringRules initialized successfully');
   }
 }

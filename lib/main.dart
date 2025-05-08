@@ -4,11 +4,15 @@ import 'providers/resume_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/upload_screen.dart';
 import 'screens/analysis_screen.dart';
+import 'utils/scoring_rules.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Global error handler to show a friendly UI on unexpected errors
+  // Validate scoring constants & regex patterns at startup.
+  ScoringRules.initialize(enableLogging: true);
+
+  // Global error handler for uncaught build/render errors.
   ErrorWidget.builder = (FlutterErrorDetails details) {
     return Scaffold(
       body: Center(
@@ -24,6 +28,9 @@ void main() {
   runApp(const SmartResumeAnalyzerApp());
 }
 
+/// The root widget of the Smart Resume Analyzer application.
+///
+/// Sets up providers, theming, routes, and the animated splash screen.
 class SmartResumeAnalyzerApp extends StatelessWidget {
   const SmartResumeAnalyzerApp({super.key});
 
@@ -43,8 +50,6 @@ class SmartResumeAnalyzerApp extends StatelessWidget {
           textTheme: const TextTheme(
             headlineSmall: TextStyle(fontWeight: FontWeight.bold),
           ),
-
-          // Unified page transitions for a polished feel
           pageTransitionsTheme: const PageTransitionsTheme(builders: {
             TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
             TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
@@ -53,8 +58,6 @@ class SmartResumeAnalyzerApp extends StatelessWidget {
             TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
           }),
         ),
-
-        // Use named routes for clarity and easy expansion
         initialRoute: '/',
         routes: {
           '/': (_) => const SplashScreen(),
@@ -67,7 +70,8 @@ class SmartResumeAnalyzerApp extends StatelessWidget {
   }
 }
 
-/// Simple splash screen with animated gradient, then navigates to Home.
+/// A full‐screen splash that animates a gradient background and
+/// scales in the app title before routing to HomeScreen.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -75,67 +79,83 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   Alignment _begin = Alignment.topLeft;
   Alignment _end = Alignment.bottomRight;
+  bool _toggled = false;
+
+  late final AnimationController _scaleController;
 
   @override
   void initState() {
     super.initState();
-    // Animate gradient immediately
-    Future.delayed(const Duration(milliseconds: 100), _animateGradient);
-    // Schedule navigation after the widget is mounted
-    _scheduleNavigation();
+
+    // Start the gradient loop.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loopGradient());
+
+    // Scale-in for the title.
+    _scaleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+      lowerBound: 0.8,
+      upperBound: 1.0,
+    )..forward();
+
+    // Auto-navigate after 3 seconds (brand-consistent duration).
+    Future.delayed(const Duration(seconds: 10), () {
+      if (mounted) Navigator.pushReplacementNamed(context, '/home');
+    });
   }
 
-  void _scheduleNavigation() {
-    if (mounted) {
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/home');
-        }
-      });
-    }
-  }
-
-  void _animateGradient() {
-    if (mounted) {
-      setState(() {
-        _begin = Alignment.bottomRight;
-        _end = Alignment.topLeft;
-      });
-    }
+  void _loopGradient() {
+    if (!mounted) return;
+    setState(() {
+      _toggled = !_toggled;
+      _begin = _toggled ? Alignment.bottomLeft : Alignment.topRight;
+      _end = _toggled ? Alignment.topRight : Alignment.bottomLeft;
+    });
+    Future.delayed(const Duration(seconds: 4), _loopGradient);
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Ensure navigation is scheduled only once when dependencies are ready
-    _scheduleNavigation();
+  void dispose() {
+    _scaleController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Scaffold(
-      body: AnimatedContainer(
-        duration: const Duration(seconds: 2),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: _begin,
-            end: _end,
-            colors: [
-              colors.primaryContainer,
-              colors.secondaryContainer,
-            ],
-          ),
+
+    return AnimatedContainer(
+      constraints: const BoxConstraints.expand(),    // ensures full‐screen
+      duration: const Duration(seconds: 4),
+      onEnd: _loopGradient,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: _begin,
+          end: _end,
+          colors: [colors.primaryContainer, colors.secondaryContainer],
         ),
+      ),
+      child: SafeArea(
         child: Center(
-          child: Text(
-            'Smart Resume Analyzer',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: colors.onPrimaryContainer,
-              fontSize: 28,
+          child: ScaleTransition(
+            scale: _scaleController.drive(
+              CurveTween(curve: Curves.easeOutBack),
+            ),
+            child: Text(
+              'Smart Resume\nAnalyzer',
+              textAlign: TextAlign.center,
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineSmall
+                  ?.copyWith(
+                color: colors.onPrimaryContainer,
+                fontSize: 42,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ),
@@ -143,3 +163,9 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 }
+
+
+
+
+
+

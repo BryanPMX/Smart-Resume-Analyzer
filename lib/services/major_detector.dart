@@ -1,52 +1,53 @@
-// major_detector.dart
 import 'dart:developer' as developer;
+import '../models/major.dart';
 import '../utils/scoring_rules.dart';
 
-/// A service that auto-detects a candidate’s academic major from resume text by matching
-/// against a predefined list of known majors and their aliases. Designed to work with
-/// `ScoringService` to tailor skill scoring and feedback.
+/// A service that auto-detects a candidate’s academic major from resume text.
+///
+/// It matches the input text against a predefined set of aliases for each
+/// `Major` enum value. Returns the unique detected `Major`, or `null` if
+/// none (or more than one) is found. Designed to integrate with
+/// `ScoringService` and `ScoringRules` for tailored skill scoring.
 class MajorDetector {
   /// Maximum text length to process to prevent excessive memory usage.
   static const int _maxTextLength = 100 * 1024; // 100 KB
 
-  /// Map of canonical majors to their possible aliases or abbreviations for detection.
-  /// Keys are canonical major names (e.g., 'Computer Science'), and values are lists of
-  /// aliases (e.g., ['Computer Science', 'CS', 'Comp Sci']).
-  static const Map<String, List<String>> _majorAliases = {
-    'Computer Science': ['Computer Science', 'CS', 'Comp Sci'],
-    'Business Administration': ['Business Administration', 'Business Admin', 'Biz Admin'],
-    'Mechanical Engineering': ['Mechanical Engineering', 'Mech Eng', 'Mechanical Eng'],
-    'Nursing': ['Nursing'],
-    'Electrical Engineering': ['Electrical Engineering', 'EE', 'Electrical Eng'],
-    'Psychology': ['Psychology', 'Psych'],
-    'Biology': ['Biology', 'Bio'],
-    'Economics': ['Economics', 'Econ'],
-    'Accounting': ['Accounting', 'Acct'],
-    'Civil Engineering': ['Civil Engineering', 'Civil Eng'],
-    'Education': ['Education', 'Edu'],
-    'Finance': ['Finance', 'Fin'],
-    'Political Science': ['Political Science', 'Poli Sci'],
-    'Marketing': ['Marketing', 'Mktg'],
-    'Communications': ['Communications', 'Comm'],
-    'Chemistry': ['Chemistry', 'Chem'],
-    'Information Technology': ['Information Technology', 'IT', 'Info Tech'],
-    'Graphic Design': ['Graphic Design', 'GD', 'Design'],
-    'Mathematics': ['Mathematics', 'Math', 'Maths'],
-    'Environmental Science': ['Environmental Science', 'Env Sci', 'Environmental Sci'],
+  /// Map of each [Major] enum to its list of lowercase aliases.
+  static final Map<Major, List<String>> _majorAliases = {
+    Major.computerScience:       ['computer science', 'cs', 'comp sci'],
+    Major.businessAdministration:['business administration', 'business admin', 'biz admin'],
+    Major.mechanicalEngineering: ['mechanical engineering', 'mech eng', 'mechanical eng'],
+    Major.nursing:               ['nursing'],
+    Major.electricalEngineering: ['electrical engineering', 'ee', 'electrical eng'],
+    Major.psychology:            ['psychology', 'psych'],
+    Major.biology:               ['biology', 'bio'],
+    Major.economics:             ['economics', 'econ'],
+    Major.accounting:            ['accounting', 'acct'],
+    Major.civilEngineering:      ['civil engineering', 'civil eng'],
+    Major.education:             ['education', 'edu'],
+    Major.finance:               ['finance', 'fin'],
+    Major.politicalScience:      ['political science', 'poli sci'],
+    Major.marketing:             ['marketing', 'mktg'],
+    Major.communications:        ['communications', 'comm'],
+    Major.chemistry:             ['chemistry', 'chem'],
+    Major.informationTechnology: ['information technology', 'it', 'info tech'],
+    Major.graphicDesign:         ['graphic design', 'gd', 'design'],
+    Major.mathematics:           ['mathematics', 'math', 'maths'],
+    Major.environmentalScience:  ['environmental science', 'env sci', 'environmental sci'],
+    Major.english:               ['english'],
+    Major.history:               ['history'],
+    Major.sociology:             ['sociology', 'soc sci', 'soc'],
   };
 
-  /// Provides the list of canonical majors for validation purposes.
-  static Iterable<String> get knownMajors => _majorAliases.keys;
+  /// Inverted lookup: alias → canonical [Major].
+  static final Map<String, Major> _aliasToMajor = _buildAliasLookup();
 
-  /// Precomputed lowercase aliases for efficient matching.
-  static final Map<String, String> _lowercaseToCanonical = _precomputeAliases();
-
-  /// Precomputes lowercase aliases mapped to their canonical major names for efficient lookup.
-  static Map<String, String> _precomputeAliases() {
-    final map = <String, String>{};
-    _majorAliases.forEach((canonical, aliases) {
+  /// Builds a lowercase alias→Major map for O(1) matching.
+  static Map<String, Major> _buildAliasLookup() {
+    final map = <String, Major>{};
+    _majorAliases.forEach((major, aliases) {
       for (var alias in aliases) {
-        map[alias.toLowerCase()] = canonical;
+        map[alias.toLowerCase()] = major;
       }
     });
     return map;
@@ -54,56 +55,48 @@ class MajorDetector {
 
   /// Detects the candidate’s academic major from the provided [text].
   ///
-  /// [text] The resume text to analyze, typically the `education` section or full text.
-  /// [enableLogging] If true, logs detection steps for debugging (default: false).
+  /// - Throws [ArgumentError] if [text] is empty or exceeds [_maxTextLength].
+  /// - Returns a single [Major] if exactly one valid match is found.
+  /// - Returns `null` if no valid match or multiple distinct matches occur.
   ///
-  /// Returns the detected major as a canonical name (e.g., 'Computer Science') if exactly
-  /// one unique major is found, or `null` if no major or multiple distinct majors are detected.
-  ///
-  /// Throws:
-  /// - [ArgumentError] If [text] is empty or exceeds the maximum length.
-  static String? detectMajor(String text, {bool enableLogging = false}) {
-    // Validate input
+  /// When [enableLogging] is true, logs each detection step for debugging.
+  static Major? detectMajor(String text, {bool enableLogging = false}) {
     if (text.isEmpty) {
       throw ArgumentError('Input text cannot be empty');
     }
     if (text.length > _maxTextLength) {
-      throw ArgumentError('Input text exceeds maximum length of $_maxTextLength characters');
+      throw ArgumentError(
+          'Input text exceeds maximum length of $_maxTextLength characters');
     }
 
-    final norm = text.toLowerCase();
-    final matchedMajors = <String>{}; // Use a set to track unique canonical majors
+    final lower = text.toLowerCase();
+    final found = <Major>{};
 
-    // Search for each alias in the text
-    for (var entry in _lowercaseToCanonical.entries) {
-      final alias = entry.key;
-      final canonical = entry.value;
-      if (norm.contains(alias)) {
-        matchedMajors.add(canonical);
+    // Check each alias; if the resume text contains it, record the Major
+    for (final entry in _aliasToMajor.entries) {
+      if (lower.contains(entry.key)) {
+        found.add(entry.value);
+        if (enableLogging) {
+          developer.log('Alias match: "${entry.key}" → ${entry.value}');
+        }
       }
     }
 
-    // Validate against ScoringRules.majorRelevantSkills
-    final validMajors = matchedMajors.where((major) {
-      final isValid = ScoringRules.majorRelevantSkills.containsKey(major);
-      if (!isValid && enableLogging) {
-        developer.log('Warning: Detected major "$major" not found in ScoringRules.majorRelevantSkills');
-      }
-      return isValid;
-    }).toList();
+    // Filter to only those Majors we have scoring rules for
+    final valid = found.where((m) =>
+        ScoringRules.majorRelevantSkills.containsKey(m)).toSet();
 
     if (enableLogging) {
-      if (validMajors.isEmpty) {
-        developer.log('No valid majors detected in text');
-      } else if (validMajors.length > 1) {
-        developer.log('Multiple majors detected: $validMajors, returning null');
+      if (valid.isEmpty) {
+        developer.log('MajorDetector: no valid majors detected');
+      } else if (valid.length > 1) {
+        developer.log('MajorDetector: ambiguous majors detected: $valid');
       } else {
-        developer.log('Detected major: ${validMajors.first}');
+        developer.log('MajorDetector: detected major: ${valid.first}');
       }
     }
 
-    // Return the major if exactly one is found, otherwise null
-    return validMajors.length == 1 ? validMajors.first : null;
+    return valid.length == 1 ? valid.first : null;
   }
 }
 
