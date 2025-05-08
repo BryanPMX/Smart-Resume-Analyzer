@@ -1,3 +1,5 @@
+// The University of Texas at El Paso: Bryan Perez
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/resume_provider.dart';
@@ -152,7 +154,7 @@ class _SplashScreenState extends State<SplashScreen>
                   .textTheme
                   .headlineSmall
                   ?.copyWith(
-                color: const Color(0xFF1E88E5),
+                color: const Color(0xFF155C9C),
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
               ),

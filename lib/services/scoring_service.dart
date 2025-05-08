@@ -1,4 +1,4 @@
-// lib/services/scoring_service.dart
+// The University of Texas at El Paso: Bryan Perez
 
 import 'dart:developer' as developer;
 import '../models/resume.dart';

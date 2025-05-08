@@ -1,4 +1,4 @@
-// lib/models/resume.dart
+// The University of Texas at El Paso: Bryan Perez
 
 import 'dart:io';
 import '../models/section_score.dart';

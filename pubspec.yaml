@@ -1,40 +1,87 @@
+# -------------------------------------------------------------------
+# Project Metadata
+# -------------------------------------------------------------------
 name: smart_resume_analyzer
-description: A cross-platform Flutter app that evaluates resumes and provides major-specific feedback.
-version: 1.0.0+1
+description: >
+  A cross-platform Flutter app that evaluates resumes,
+  detects academic majors, and provides tailored feedback.
+version: 1.0.0+1         # Semantic versioning: MAJOR.MINOR.PATCH+BUILD
 
+# -------------------------------------------------------------------
+# SDK Constraints
+# -------------------------------------------------------------------
 environment:
+  # Requires at least Dart SDK 3.0.0 and below 4.0.0
   sdk: ">=3.0.0 <4.0.0"
 
+# -------------------------------------------------------------------
+# Flutter & Core Dependencies
+# -------------------------------------------------------------------
 dependencies:
+  # Flutter framework itself
   flutter:
     sdk: flutter
 
-  image_picker: ^1.1.2
-
-  permission_handler: ^12.0.0+1
-
-  google_fonts: ^6.2.1
-
-  # State management
-  provider: ^6.1.1
-
-  # File selection and PDF parsing
-  file_picker: ^10.1.2
-  syncfusion_flutter_pdf: ^29.1.38
-
-  # HTTP for networking (used in online analysis mode)
-  http: ^1.3.0
-
-  # Optional: rendering the resume as a blurred PDF in the background
-  flutter_pdfview: ^1.2.0
-
-  # Core Flutter packages
+  # Icons for iOS-style widgets
   cupertino_icons: ^1.0.6
 
+  # -----------------------------------------------------------------
+  # UI / Styling
+  # -----------------------------------------------------------------
+  # Custom Google Fonts
+  google_fonts: ^6.2.1
+
+  # -----------------------------------------------------------------
+  # State Management
+  # -----------------------------------------------------------------
+  # Simple, provider-based state management
+  provider: ^6.1.1
+
+  # -----------------------------------------------------------------
+  # Media & File Handling
+  # -----------------------------------------------------------------
+  # Pick images from gallery or camera
+  image_picker: ^1.1.2
+  # Pick any file type (PDFs, docs, etc.)
+  file_picker: ^10.1.2
+  # View PDFs in-app (optional background rendering)
+  flutter_pdfview: ^1.2.0
+
+  # -----------------------------------------------------------------
+  # PDF Parsing & Analysis
+  # -----------------------------------------------------------------
+  # Syncfusion library to extract text & preserve layout
+  syncfusion_flutter_pdf: ^29.1.38
+
+  # -----------------------------------------------------------------
+  # Permissions
+  # -----------------------------------------------------------------
+  # Handle camera, storage, and other permissions
+  permission_handler: ^12.0.0+1
+
+  # -----------------------------------------------------------------
+  # Networking
+  # -----------------------------------------------------------------
+  # HTTP client for online resume analysis API calls
+  http: ^1.3.0
+
+# -------------------------------------------------------------------
+# Development & Testing Dependencies
+# -------------------------------------------------------------------
 dev_dependencies:
+  # Flutter’s built-in testing framework
   flutter_test:
     sdk: flutter
+  # Recommended lint rules for Flutter projects
   flutter_lints: ^5.0.0
 
+# -------------------------------------------------------------------
+# Flutter Settings
+# -------------------------------------------------------------------
 flutter:
+  # Include assets, fonts, etc., here if needed:
+  # assets:
+  #   - assets/images/
+  #   - assets/fonts/
   uses-material-design: true
+

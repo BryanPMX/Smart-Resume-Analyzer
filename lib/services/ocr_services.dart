@@ -1,4 +1,5 @@
-// services/ocr_service.dart
+// The University of Texas at El Paso: Bryan Perez
+
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:async';

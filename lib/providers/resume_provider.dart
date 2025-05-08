@@ -1,4 +1,4 @@
-// lib/providers/resume_provider.dart
+// The University of Texas at El Paso: Bryan Perez
 
 import 'package:flutter/foundation.dart';
 import '../models/resume.dart';

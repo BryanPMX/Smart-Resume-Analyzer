@@ -1,3 +1,5 @@
+// The University of Texas at El Paso: Bryan Perez
+
 import 'dart:developer' as developer;
 import '../models/major.dart';
 import '../utils/scoring_rules.dart';

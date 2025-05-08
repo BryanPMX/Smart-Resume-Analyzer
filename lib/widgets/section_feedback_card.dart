@@ -1,3 +1,5 @@
+// The University of Texas at El Paso: Bryan Perez
+
 import 'package:flutter/material.dart';
 
 /// A card that presents the analysis of a single resume section,

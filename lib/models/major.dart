@@ -1,3 +1,5 @@
+// The University of Texas at El Paso: Bryan Perez
+
 /// Represents the academic or professional major / field of study
 /// used to tailor resume scoring rules and feedback.
 enum Major {

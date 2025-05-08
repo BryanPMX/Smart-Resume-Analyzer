@@ -1,4 +1,4 @@
-// lib/screens/upload_screen.dart
+// The University of Texas at El Paso: Bryan Perez
 
 import 'dart:io';
 
@@ -207,7 +207,7 @@ class _UploadScreenState extends State<UploadScreen>
           title: Text(
             'Smart Resume Analyzer',
             style: GoogleFonts.merriweather(
-              color: const Color(0xFF1E88E5),
+              color: const Color(0xFF155C9C),
               fontWeight: FontWeight.w700,
               fontSize: 24,
             ),

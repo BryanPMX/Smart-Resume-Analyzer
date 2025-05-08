@@ -1,4 +1,5 @@
-// section_score.dart
+// The University of Texas at El Paso: Bryan Perez
+
 import 'dart:developer' as developer;
 
 /// Model representing the evaluation result of a specific section in the resume.
