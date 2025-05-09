@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../providers/resume_provider.dart';
 import '../widgets/section_feedback_card.dart';
 
@@ -141,4 +140,3 @@ class _AnalysisScreenState extends State<AnalysisScreen>
     );
   }
 }
-
